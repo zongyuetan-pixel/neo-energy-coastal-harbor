@@ -4,7 +4,9 @@
 
 ## 启动
 
-在本目录运行 `npm start`，访问 `http://127.0.0.1:5173`。无需安装 npm 依赖；首次访问需要联网加载固定版本的 Three.js 0.160.0。
+使用 Node.js 22.12 或更高的 22.x 版本，先运行 `npm ci`，再运行 `npm start`，访问 `http://127.0.0.1:5173`。
+
+生产版本使用 Vite 构建，Three.js 固定为原有的 0.160.0，与场景代码一同打包，不再通过外部 CDN 加载。所有模型、纹理、图表由本地代码和 Canvas 生成，无 GLB/GLTF、远程图片或字体下载；字体沿用系统字体设置。
 
 浏览器的 `file://` 安全限制可能阻止模块导入，请使用上面的本地服务器。
 
@@ -39,3 +41,13 @@
 运行 `npm run check` 可以检查所有场景脚本的语法。
 
 运行 `npm test` 检查环路闭合、接缝切线、道路边界和返回各车位的路线。
+
+## Vercel 生产部署
+
+- GitHub 仓库生产分支：`main`。
+- 框架：Vite；安装：`npm ci`；构建：`npm run build`；输出目录：`dist`。
+- `vercel.json` 已配置构建和带内容哈希的资源缓存，无需环境变量或服务端。
+- `npm run check`、`npm test`、`npm run build` 用于发布前验证；`npm run preview` 在本机 4173 端口预览真实产物。
+- 这是单页三维场景，五个视角均在首页内切换，没有其他客户端路由，不需要将丢失的资源重写到首页。
+- 原 `.openai/hosting.json` 仅保留旧站点记录，不参与 Vercel 构建。生产产物不包含本地服务器、临时文件或平台凭据。
+- 在 Vercel 导入 GitHub 仓库后，将 Production Branch 设置为 `main`；公开分享需关闭 Production 的 Deployment Protection。后续推送到 `main` 自动生产部署。

@@ -3,5 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node tools/server.cjs", "build": "node tools/build.cjs", "check": "node --check src/main.js && node --check src/assets.js && node --check src/world.js && node --check src/ring-road.js && node --check src/landscape.js && node --check src/route.js && node --check src/exchange-card.js && node --check src/data-pipe.js && node --check src/click-navigation.js && node --check src/charging-motion.js", "test": "node --test tests/*.test.js" }
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "start": "vite --host 127.0.0.1 --port 5173",
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vite build && node tools/verify-build.cjs",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "check": "node --check src/main.js && node --check src/assets.js && node --check src/world.js && node --check src/ring-road.js && node --check src/landscape.js && node --check src/route.js && node --check src/exchange-card.js && node --check src/data-pipe.js && node --check src/click-navigation.js && node --check src/charging-motion.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": { "three": "0.160.0" },
+  "devDependencies": { "vite": "8.3.0" }
 }

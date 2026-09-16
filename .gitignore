@@ -5,3 +5,8 @@ node_modules/
 *.tar.gz
 .openai/*profile*
 .openai/*metrics*
+.vercel/
+.env
+.env.*
+!.env.example
+*.log
