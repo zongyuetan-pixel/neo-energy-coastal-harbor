@@ -1,0 +1,7 @@
+sources/
+AGENTS.md
+dist/
+node_modules/
+*.tar.gz
+.openai/*profile*
+.openai/*metrics*

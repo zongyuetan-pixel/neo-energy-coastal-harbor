@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#13323e" />
+  <title>NEO ENERGY · 海岸充电港</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <main id="app"></main>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">ϟ</span><div><b>NEO ENERGY<span class="brand-dot">®</span></b><span class="subtitle">海岸充电港 <i></i> COASTAL CHARGING</span></div></div>
+    <div class="live"><span></span>绿色能源 · 自然共生</div>
+  </header>
+  <aside class="scene-caption"><span>THE COASTAL SERIES / 01</span><h1>向海而行，<br>为未来蓄能。</h1><p>风能 · 光伏 · 智能充电</p></aside>
+  <nav class="view-switch" aria-label="场景视角">
+    <button data-view="overview" class="active">全景</button>
+    <button data-view="car">车辆特写</button>
+    <button data-view="charger">充电桩</button>
+    <button data-view="exchange">交易所</button>
+    <button data-view="harbor">海港</button>
+  </nav>
+  <section class="control-panel" aria-label="驾驶与充电控制">
+    <div class="panel-top"><span class="eyebrow">YOUR ELECTRIC JOURNEY</span><span class="state"><i></i><b id="status">道路行驶</b></span></div>
+    <div class="panel-main">
+      <div class="vehicle-info"><button class="car-icon" id="select-car" aria-label="选中小车，点击道路目的地" aria-pressed="false">↗</button><div><strong>Model 3 造型 / 无标白色轿车</strong><small><b id="speed">0</b> km/h <span>·</span> 点选驾驶</small></div></div>
+      <div class="charge-select"><label for="bay-select">目标车位</label><select id="bay-select"><option value="0">EV 01</option><option value="1" selected>EV 02</option><option value="2">EV 03</option><option value="3">EV 04</option></select></div>
+      <button class="primary" id="charge-button"><span>ϟ</span> 自动泊车充电 <kbd>P</kbd></button>
+      <button class="secondary" id="leave-button" disabled>驶出车位 ↗</button>
+    </div>
+    <div class="journey-row"><button id="loop-button">环路巡航 ↻</button><small id="route-progress">先点击小车，再点击道路选择目的地</small></div>
+    <div class="energy-row"><span><i class="link-icon">∞</i> 能量奖励 <strong id="reward">+100 RWAT</strong></span><small><span id="bay-label">EV 02</span> · 上链动画演示</small></div>
+    <div class="progress-track"><div id="progress"></div></div>
+  </section>
+  <footer><span><kbd>点击小车</kbd> 选中 → 点击道路前往　<kbd>W A S D</kbd> 手动驾驶　<span class="desktop-help">· 拖动旋转 · 滚轮缩放</span></span><button id="reset-button">重置场景 <kbd>R</kbd></button></footer>
+  <div class="touch-drive" aria-label="触屏驾驶"><button data-key="w" aria-label="前进">↑</button><div><button data-key="a" aria-label="左转">←</button><button data-key="s" aria-label="后退">↓</button><button data-key="d" aria-label="右转">→</button></div></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <p class="sr-only">充电桩后方展示中港世纪web3-专属RWAT交易所（CEX）透明App卡片。RWAT K线和价格为动态模拟行情，非实时交易数据。透明管道连接充电卡片与App卡片，光点沿管道传输，充电时加速。点击“交易所”查看特写。</p>
+  <div id="loading"><span>ϟ</span><p>正在构建海岸充电港…</p><small id="load-hint">加载三维场景与模型</small></div>
+  <script>
+    window.addEventListener('error', function () {
+      if (!document.getElementById('loading').classList.contains('done')) {
+        document.getElementById('load-hint').textContent = '场景加载失败，请检查网络连接并通过本地服务器打开。';
+      }
+    });
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
