@@ -2,12 +2,29 @@ import * as THREE from 'three';
 import {createEnergyFlow} from './energy-flow.js';
 
 // A shared camera-facing plane keeps the diagram readable while orbiting.
-export function createEnergyNetwork(scene,appCard,chargeCard,onArrival=()=>{}){
+export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
   const group=new THREE.Group();group.name='充电桩 → 预言机 → 联盟链 → 交易所';scene.add(group);
   const flow=createEnergyFlow(),right=new THREE.Vector3(),up=new THREE.Vector3();
   const anchor=new THREE.Vector3(),dummy=new THREE.Object3D();
   const mint='#79f5d0',blue='#8ddcff',muted='#96bac8';
-  let paintAge=1,lastKey='',state=flow.update(0,false),liftSignature='';
+  let paintAge=1,lastKey='',state=flow.update(0,false),elapsed=0;
+  // The physical uplink sits directly on the selected charger's roof.
+  const uplink=new THREE.Group();uplink.name='充电桩顶部 · 数据上行光球';scene.add(uplink);
+  const orb=new THREE.Mesh(new THREE.SphereGeometry(.14,32,24),
+    new THREE.MeshStandardMaterial({color:0xb9fff2,emissive:0x50ffdb,emissiveIntensity:2.4,roughness:.18}));
+  orb.position.y=.24;uplink.add(orb);
+  const socket=new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,.055,32),
+    new THREE.MeshStandardMaterial({color:0x8babaf,metalness:.8,roughness:.26}));
+  socket.position.y=.0275;uplink.add(socket);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.24,.012,8,48),
+    new THREE.MeshBasicMaterial({color:0x71ffe0,transparent:true,opacity:.7}));
+  ring.rotation.x=Math.PI/2;ring.position.y=.1;uplink.add(ring);
+  const glowCanvas=document.createElement('canvas');glowCanvas.width=glowCanvas.height=128;
+  const glowContext=glowCanvas.getContext('2d'),gradient=glowContext.createRadialGradient(64,64,0,64,64,64);
+  gradient.addColorStop(0,'rgba(177,255,235,.8)');gradient.addColorStop(.24,'rgba(76,255,211,.35)');gradient.addColorStop(1,'rgba(76,255,211,0)');
+  glowContext.fillStyle=gradient;glowContext.fillRect(0,0,128,128);
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(glowCanvas),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  glow.position.y=.24;glow.scale.setScalar(.95);uplink.add(glow);
   function panel(name,w,h,width,height){
     const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
     const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;
@@ -84,19 +101,25 @@ export function createEnergyNetwork(scene,appCard,chargeCard,onArrival=()=>{}){
     group.add(shell,core,packets,arrow);
     return {shell,core,packets,arrow,stage:i<3?0:i<6?1:2,curve:null,signature:[]};
   });
-  const lift=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineDashedMaterial({
-    color:0x88e9d8,transparent:true,opacity:.5,dashSize:.12,gapSize:.12,
-  }));group.add(lift);
   const point=(x,y)=>anchor.clone().addScaledVector(right,x).addScaledVector(up,y);
   function update(dt,camera,charging,reward=100,station=null){
     state={...flow.update(dt,charging),reward};
     if(state.arrivals)onArrival(state.arrivals,state.delivered);
     right.set(1,0,0).applyQuaternion(camera.quaternion);up.set(0,1,0).applyQuaternion(camera.quaternion);
-    anchor.copy(chargeCard.position);
+    if(!station)return state;
+    station.updateWorldMatrix(true,false);
+    anchor.copy(station.localToWorld(new THREE.Vector3(0,5.26,0)));
+    uplink.position.copy(station.localToWorld(new THREE.Vector3(0,3.09,0)));
+    elapsed+=dt;
+    const pulse=charging?.5+.5*Math.sin(elapsed*5):.15;
+    orb.material.emissiveIntensity=1.8+pulse*2;
+    glow.material.opacity=.45+pulse*.35;
+    ring.scale.setScalar(1+pulse*.15);
+    const source=uplink.position.clone().add(new THREE.Vector3(0,.24,0));
     oracles.forEach((p,i)=>p.sprite.position.copy(point((i-1)*4.4,4.5)));
     chain.sprite.position.copy(point(0,8.5));appCard.position.copy(point(-10.15,4.05));
     const endpoints=[
-      ...oracles.map(p=>[point(0,1.39),p.sprite.position.clone().addScaledVector(up,-1.04)]),
+      ...oracles.map(p=>[source.clone(),p.sprite.position.clone().addScaledVector(up,-1.04)]),
       ...oracles.map((p,i)=>[p.sprite.position.clone().addScaledVector(up,1.04),point((i-1)*3.3,7.415)]),
       [point(-6.2,8.5),appCard.position.clone().addScaledVector(right,2.9)],
     ];
@@ -122,13 +145,6 @@ export function createEnergyNetwork(scene,appCard,chargeCard,onArrival=()=>{}){
         link.packets.instanceMatrix.needsUpdate=true;
       }
     });
-    if(station){
-      const from=station.position.clone().add(new THREE.Vector3(0,2.8,0)),to=point(0,-1.39);
-      const signature=[...from.toArray(),...to.toArray()].map(n=>n.toFixed(3)).join('/');
-      if(signature!==liftSignature){
-        liftSignature=signature;lift.geometry.dispose();lift.geometry=new THREE.BufferGeometry().setFromPoints([from,to]);lift.computeLineDistances();
-      }
-    }
     paintAge+=dt;const key=`${charging}/${state.stage}/${state.delivered}`;
     if(paintAge>.15||key!==lastKey){paintAge=0;lastKey=key;draw();}
     return state;
