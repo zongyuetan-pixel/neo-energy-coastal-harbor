@@ -5,7 +5,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createCar, materials, texture } from './assets.js';
+import { materials, texture } from './assets.js';
+import {createCar} from './ev-car.js';
 import { buildWorld } from './world.js';
 import {TRACK,loopPoint,nearestOnLoop,travelToBay} from './route.js';
 import {createExchangeCard} from './exchange-card.js';
@@ -117,7 +118,8 @@ function notify(message){
 }
 function syncUI(){
   $('speed').textContent=String(Math.round(Math.abs(speed)*3.6));
-  $('status').textContent=phase==='cruising'&&tourPaused?'巡航已暂停':phase==='connecting'&&gunMotion?sampleChargingMotion(gunMotion,gunTime).label:modes[phase];
+  $('status').textContent=phase==='navigating'&&(navigationPlan?.reverse||autopilot?.reverse)?'倒车前往点击位置':phase==='cruising'&&tourPaused?'巡航已暂停':phase==='connecting'&&gunMotion?sampleChargingMotion(gunMotion,gunTime).label:modes[phase];
+  document.body.dataset.gear=speed<-.02?'R':Math.abs(speed)>.02?'D':'P';
   $('reward').textContent=`+${Math.floor(reward)} RWAT`;
   $('bay-label').textContent=`EV ${String(chosen+1).padStart(2,'0')}`;
   $('charge-button').disabled=phase!=='idle';
@@ -127,9 +129,9 @@ function syncUI(){
   $('loop-button').textContent=phase==='cruising'?(tourPaused?'继续巡航 ▶':'暂停巡航 Ⅱ'):'环路巡航 ↻';
   $('loop-button').disabled=['parking','leaving','navigating','disconnecting'].includes(phase);
   $('select-car').setAttribute('aria-pressed',String(carSelected));
-  $('route-progress').textContent=navigationPlan?`前往目标 · 剩余 ${Math.ceil(Math.max(0,navigationPlan.total-navigationDistance))} m`
+  $('route-progress').textContent=navigationPlan?`${navigationPlan.reverse?'倒车':'前进'}至目标 · 剩余 ${Math.ceil(Math.max(0,navigationPlan.total-navigationDistance))} m`
     :tour?`已行驶 ${Math.floor(tour.traveled)} m · 回站后自动充电`
-    :carSelected?'小车已选中 · 点击道路或充电车位':'先点击小车，再点击道路选择目的地';
+    :carSelected?'点击车前方前进 · 车后方倒车 · 车位充电':'先点击小车，再点击道路选择目的地';
   document.body.dataset.phase=phase;
   drawCard(Math.floor(reward),phase);
 }
@@ -150,9 +152,9 @@ function selectCar(){
   if(['parking','leaving','disconnecting'].includes(phase)){notify('请等待车辆停稳或充电枪归位后选择目的地');return;}
   carSelected=true;selectionRing.visible=true;
   if(phase==='navigating'||phase==='cruising'){
-    tour=null;tourPaused=false;clearDestination();speed=0;setPhase('idle');
+    tour=null;tourPaused=false;autopilot=null;clearDestination();speed=0;setPhase('idle');
   }
-  syncUI();notify('小车已选中，请点击道路上的目的地；点击车位可自动充电');
+  syncUI();notify('点击车前方前进、车后方倒车；点击车位自动充电');
 }
 function drawRoadGuide(plan){
   const points=[],steps=Math.max(2,Math.ceil(plan.total/.4));
@@ -179,15 +181,16 @@ function beginNavigation(destination){
   if(destination.kind==='bay'){
     selectBay(destination.bay);park(destination.bay);return;
   }
-  navigationPlan=planRoadTrip(car.position,destination);navigationDistance=0;
+  navigationPlan=planRoadTrip(car.position,destination,car.rotation.y);navigationDistance=0;
   // Same longitudinal location: slide a small distance within the road, not a lap.
   if(navigationPlan.total<.08){
     const separation=Math.hypot(destination.x-car.position.x,destination.z-car.position.z);
     if(separation<.12){clearDestination();notify('小车已在目标位置');return;}
-    autopilot={curve:new THREE.LineCurve3(car.position.clone(),new THREE.Vector3(destination.x,.44,destination.z)),t:0,duration:1.2,reverse:false};
+    const reverse=-(destination.x-car.position.x)*Math.sin(car.rotation.y)-(destination.z-car.position.z)*Math.cos(car.rotation.y)<0;
+    autopilot={curve:new THREE.LineCurve3(car.position.clone(),new THREE.Vector3(destination.x,.44,destination.z)),t:0,duration:1.2,reverse};
     navigationPlan=null;
   }else drawRoadGuide(navigationPlan);
-  setPhase('navigating');notify('沿道路前往目标位置；点击其他道路位置可重新规划');
+  setPhase('navigating');notify(navigationPlan?.reverse||autopilot?.reverse?'已挂倒挡，沿道路倒车至点击位置':'沿道路前往目标位置；点击车后方可倒车');
 }
 function toggleTour(){
   if(phase==='cruising'){
@@ -393,6 +396,7 @@ const clock=new THREE.Clock();
 let time=0,uiTime=0;
 function animate(){
   const dt=Math.min(clock.getDelta(),.05);time+=dt;phaseTime+=dt;
+  const previousYaw=car.rotation.y;
   exchange.update(dt);
   world.waterUniforms.time.value=time;
   world.turbines.forEach((rotor,i)=>rotor.rotation.z-=dt*(.46+i*.04));
@@ -403,12 +407,14 @@ function animate(){
   }
   if(phase==='navigating'&&navigationPlan){
     const remaining=navigationPlan.total-navigationDistance;
-    speed=THREE.MathUtils.damp(speed,Math.min(6.5,Math.max(.7,Math.sqrt(remaining*5))),3,dt);
-    navigationDistance=Math.min(navigationPlan.total,navigationDistance+speed*dt);
+    const reverse=navigationPlan.reverse,sign=reverse?-1:1;
+    const magnitude=THREE.MathUtils.damp(Math.abs(speed),Math.min(reverse?2.8:6.5,Math.max(.5,Math.sqrt(remaining*5))),3,dt);
+    speed=magnitude*sign;
+    navigationDistance=Math.min(navigationPlan.total,navigationDistance+magnitude*dt);
     const p=roadTripPoint(navigationPlan,navigationDistance);
     const old=car.position.clone();car.position.set(p.x,.44,p.z);
     const delta=car.position.clone().sub(old);
-    const theta=delta.lengthSq()>.0000001?Math.atan2(-delta.x,-delta.z):car.rotation.y;
+    const theta=delta.lengthSq()>.0000001?Math.atan2(-delta.x,-delta.z)+(reverse?Math.PI:0):car.rotation.y;
     car.rotation.y=angleLerp(car.rotation.y,theta,Math.min(dt*9,1));
     if(navigationDistance>=navigationPlan.total){
       speed=0;clearDestination();setPhase('idle');notify('已到达点击位置，点击道路可继续行驶');
@@ -469,6 +475,10 @@ function animate(){
     if(reward>=1000){setPhase('charged');notify('充电完成 · +1000 RWAT 已记录（演示）');}
   }
   vehicle.wheels.forEach(wheel=>wheel.rotation.x-=speed*dt/vehicle.wheelRadius);
+  const yawDelta=Math.atan2(Math.sin(car.rotation.y-previousYaw),Math.cos(car.rotation.y-previousYaw));
+  const steer=Math.abs(speed)>.1?THREE.MathUtils.clamp(Math.atan(2.87*yawDelta/(speed*dt)),-.5,.5):0;
+  vehicle.steering.forEach(pivot=>pivot.rotation.y=THREE.MathUtils.damp(pivot.rotation.y,steer,8,dt));
+  vehicle.reverseLights.visible=speed<-.05;
   selectionRing.position.set(car.position.x,.474,car.position.z);
   selectionRing.rotation.set(-Math.PI/2,0,-car.rotation.y);
   targetPin.position.y=.8+Math.sin(time*3.5)*.12;

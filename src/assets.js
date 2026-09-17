@@ -268,19 +268,85 @@ export function createBoat(sailboat=false) {
 }
 
 export function createTurbine() {
-  const group=new THREE.Group(),m=materials;
-  rounded(group,1.35,.25,1.35,m.white,0,.125,0,.15);
-  mesh(group,new THREE.CylinderGeometry(.12,.27,7.1,18),m.white,0,3.7,0);
-  rounded(group,.4,.43,.92,m.white,0,7.18,0,.14);
-  const rotor=new THREE.Group();rotor.position.set(0,7.18,.55);group.add(rotor);
-  mesh(rotor,new THREE.SphereGeometry(.24,20,12),m.white);
+  const group=new THREE.Group(),m=materials;group.name='Aerodynamic smart wind turbine';
+  const shell=new THREE.MeshStandardMaterial({color:0xeaf0ef,metalness:.24,roughness:.39});
+  const status=new THREE.MeshStandardMaterial({color:0x8ee5dc,emissive:0x35cdbf,emissiveIntensity:.6,roughness:.3});
+  // Bolted concrete plinth, steel flange and a gently tapered sectional tower.
+  rounded(group,1.4,.19,1.4,m.white,0,.095,0,.12);
+  mesh(group,new THREE.CylinderGeometry(.45,.49,.13,40),m.silver,0,.225,0);
+  mesh(group,new THREE.CylinderGeometry(.17,.29,6.96,40),shell,0,3.75,0);
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6;
+    mesh(group,new THREE.CylinderGeometry(.025,.025,.046,6),m.dark,Math.sin(a)*.393,.308,Math.cos(a)*.393);
+  }
+  for(const y of [2.62,4.95,7.18]){
+    const radius=.29-(y-.27)/6.96*.12;
+    mesh(group,new THREE.CylinderGeometry(radius+.006,radius+.006,.024,40),m.silver,0,y,0);
+  }
+  rounded(group,.26,.55,.035,m.dark,0,.66,.28,.09);
+  rounded(group,.226,.49,.038,shell,0,.668,.302,.07);
+  rod(group,[.066,.64,.328],[.066,.75,.328],.009,m.dark);
+  rounded(group,.55,.08,.33,m.silver,0,.23,.49,.025);
+  label(group,'NEO / WIND',.34,.08,0,1.31,.28,{color:'#4d7280',font:34});
+  // Fine status band and inset service indicator, not a luminous toy tower.
+  mesh(group,new THREE.CylinderGeometry(.278,.279,.043,40),status,0,1.04,0);
+  rounded(group,.026,.38,.012,status,-.09,.7,.326,.006);
+  const nacelle=new THREE.Group();nacelle.position.y=7.28;group.add(nacelle);
+  rounded(nacelle,.64,.55,1.26,shell,0,.08,-.21,.2);
+  rounded(nacelle,.5,.13,.89,m.white,0,.364,-.26,.05);
+  for(const s of [-1,1]){
+    rounded(nacelle,.013,.2,.48,m.dark,s*.322,.084,-.42,.018);
+    for(let j=0;j<6;j++)rounded(nacelle,.017,.014,.4,m.silver,s*.332,.014+j*.028,-.42,.004);
+    rounded(nacelle,.013,.017,.44,status,s*.33,.275,-.3,.004);
+  }
+  // Maintenance hatch, top guard rail, anemometer and aviation beacon.
+  rounded(nacelle,.31,.03,.32,m.silver,0,.449,-.40,.015);
+  for(const x of [-.25,.25]){
+    for(const z of [-.65,.09])rod(nacelle,[x,.36,z],[x,.60,z],.012,m.silver);
+    rod(nacelle,[x,.6,-.65],[x,.6,.09],.012,m.silver);
+  }
+  rod(nacelle,[0,.40,-.61],[0,.91,-.61],.016,m.silver);
+  for(let i=0;i<3;i++){
+    const a=i*Math.PI*2/3,tip=[Math.cos(a)*.115,.85,-.61+Math.sin(a)*.115];
+    rod(nacelle,[0,.85,-.61],tip,.009,m.dark);
+    mesh(nacelle,new THREE.SphereGeometry(.035,10,8),m.dark,...tip);
+  }
+  mesh(nacelle,new THREE.CylinderGeometry(.047,.047,.055,12),m.red,0,.455,.13);
+  const bearing=mesh(nacelle,new THREE.CylinderGeometry(.23,.23,.2,32),m.dark,0,.03,.46);bearing.rotation.x=Math.PI/2;
+  const rotor=new THREE.Group();rotor.position.set(0,7.31,.70);group.add(rotor);
+  const hub=mesh(rotor,new THREE.SphereGeometry(.26,32,20),shell);hub.scale.set(1,1,1.36);
+  const halo=mesh(rotor,new THREE.TorusGeometry(.208,.012,8,40),status,0,0,.185);
+  halo.rotation.z=.1;
+  // Spanwise airfoil sections with changing chord, camber, twist and swept tips.
+  const sections=[
+    [.18,.15,.075,0,26],[.39,.27,.065,-.04,22],[.70,.45,.054,-.08,17],
+    [1.10,.42,.044,-.05,12],[1.7,.31,.032,.01,8],[2.3,.21,.024,.075,4],
+    [2.78,.125,.015,.13,1],[3.10,.036,.005,.20,-2],[3.17,.004,.001,.21,-3],
+  ];
+  const coordinates=[],indices=[],ring=32;
+  for(const [span,chord,thickness,sweep,degrees] of sections){
+    const twist=THREE.MathUtils.degToRad(degrees);
+    for(let j=0;j<=ring;j++){
+      const angle=j/ring*Math.PI*2,u=(1-Math.cos(angle))*.5;
+      const x=(u-.3)*chord;
+      const z=Math.sin(angle)*thickness*(1-.45*u)+Math.sin(u*Math.PI)*.025;
+      coordinates.push(sweep+x*Math.cos(twist)-z*Math.sin(twist),span,x*Math.sin(twist)+z*Math.cos(twist));
+    }
+  }
+  for(let i=0;i<sections.length-1;i++)for(let j=0;j<ring;j++){
+    const a=i*(ring+1)+j,b=a+ring+1;indices.push(a,b,a+1,b,b+1,a+1);
+  }
+  const bladeGeometry=new THREE.BufferGeometry();
+  bladeGeometry.setAttribute('position',new THREE.Float32BufferAttribute(coordinates,3));
+  bladeGeometry.setIndex(indices);bladeGeometry.computeVertexNormals();
+  const bladeMaterial=shell.clone();bladeMaterial.side=THREE.DoubleSide;
   for(let i=0;i<3;i++){
     const pivot=new THREE.Group();pivot.rotation.z=i*Math.PI*2/3;rotor.add(pivot);
-    const outline=new THREE.Shape();
-    outline.moveTo(-.12,.14);outline.bezierCurveTo(-.24,.75,-.14,1.9,.04,2.75);
-    outline.quadraticCurveTo(.08,2.86,.14,2.67);outline.lineTo(.27,.76);
-    outline.quadraticCurveTo(.25,.35,.13,.15);outline.closePath();
-    mesh(pivot,new THREE.ExtrudeGeometry(outline,{depth:.045,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.025,bevelThickness:.025}),m.white);
+    mesh(pivot,bladeGeometry,bladeMaterial);
+    mesh(pivot,new THREE.CylinderGeometry(.092,.102,.21,24),m.silver,0,.29,0);
+    // Short cyan inspection marks and a dark lightning-receptor tip.
+    tube(pivot,[[.147,2.7,.019],[.177,2.87,.012],[.195,3.01,.006]],.012,status);
+    mesh(pivot,new THREE.SphereGeometry(.019,10,8),m.silver,.208,3.11,0);
   }
   return {group,rotor};
 }
