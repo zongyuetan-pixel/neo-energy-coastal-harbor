@@ -1,0 +1,14 @@
+.git/
+.openai/
+.codex/
+.agents/
+sources/
+AGENTS.md
+output/
+.playwright-cli/
+node_modules/
+dist/
+*.tar.gz
+.env
+.env.*
+*.log
