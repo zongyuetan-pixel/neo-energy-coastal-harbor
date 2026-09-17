@@ -7,9 +7,10 @@ export function createExchangeCard(scene){
   const ctx=canvas.getContext('2d');
   const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;
   const card=new THREE.Sprite(new THREE.SpriteMaterial({
-    map,transparent:true,depthWrite:false,toneMapped:false,
+    map,transparent:true,depthWrite:false,depthTest:false,toneMapped:false,
   }));
   card.name='中港世纪web3-专属RWAT交易所（CEX）';
+  card.renderOrder=12;
   card.position.set(-6.8,7.9,-9.8);card.scale.set(5.8,8.9,1);
   scene.add(card);
   const lightMaterial=new THREE.MeshBasicMaterial({color:0x64eacb,transparent:true,opacity:.48,depthWrite:false});
@@ -31,7 +32,8 @@ export function createExchangeCard(scene){
     candles.push({open,close:price,high:Math.max(open,price)+random()*.019,low:Math.min(open,price)-random()*.019,volume:.2+random()*.8});
   }
   const reference=candles[0].open;
-  let elapsed=0,candleAge=0,paintAge=0,sequence=0;
+  let elapsed=0,candleAge=0,paintAge=0,sequence=0,receivedBatches=0,receiptFlash=0;
+  const previousAnchor=new THREE.Vector3(1e6,0,0);
   const green='#6ef0bf',red='#ff839c',muted='#92b6c5',ink='#edfaff';
   function text(value,x,y,size,color=ink,weight=400){
     ctx.fillStyle=color;ctx.font=`${weight} ${size}px "Microsoft YaHei", sans-serif`;ctx.textAlign='left';ctx.fillText(value,x,y);
@@ -118,12 +120,13 @@ export function createExchangeCard(scene){
     text('最高',324,1151,20,muted);text(latest.high.toFixed(4),324,1187,27,green,600);
     text('最低',594,1151,20,muted);text(latest.low.toFixed(4),594,1187,27,red,600);
     round(52,1234,796,76,18,'rgba(101,218,202,.07)','rgba(152,224,218,.18)');
-    text('模拟行情 · 非实时交易数据',76,1267,22,muted);
-    text('ENERGY TO VALUE',76,1295,16,'#6f9daa',500);
+    text(receiptFlash>0?'联盟链数据已接收 · K线同步中':'模拟行情 · 非实时交易数据',76,1267,22,receiptFlash>0?green:muted);
+    text(`联盟链同步  ${receivedBatches} 批  /  ENERGY TO VALUE`,76,1295,16,'#6f9daa',500);
     text(`更新 ${String(sequence).padStart(4,'0')}`,685,1280,18,green);
     map.needsUpdate=true;
   }
   function update(dt){
+    receiptFlash=Math.max(0,receiptFlash-dt);
     elapsed+=dt;candleAge+=dt;paintAge+=dt;
     const current=candles.at(-1);
     // Oscillations create visible upward and downward intrabar movement.
@@ -140,5 +143,25 @@ export function createExchangeCard(scene){
     if(paintAge>=.1){paintAge=0;sequence++;draw();}
   }
   draw();
-  return {card,update};
+  return {
+    card,update,
+    receiveBatch(count,total){
+      receivedBatches=total;receiptFlash=1.15;
+      // Every confirmed batch creates a chart sample; the market stays simulated.
+      const open=candles.at(-1).close;
+      candles.push({open,close:open,high:open,low:open,volume:Math.min(1,.35+count*.1)});
+      candles.shift();candleAge=0;draw();
+    },
+    resetBatches(){receivedBatches=0;receiptFlash=0;draw();},
+    updateAnchor(){
+      if(previousAnchor.distanceToSquared(card.position)<.0001)return;
+      previousAnchor.copy(card.position);
+      base.position.set(card.position.x,.565,card.position.z);
+      beam.geometry.dispose();
+      beam.geometry=new THREE.BufferGeometry().setFromPoints([
+        base.position.clone(),card.position.clone().add(new THREE.Vector3(0,-4.45,0)),
+      ]);
+      beam.computeLineDistances();
+    },
+  };
 }

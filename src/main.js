@@ -9,7 +9,7 @@ import { createCar, materials, texture } from './assets.js';
 import { buildWorld } from './world.js';
 import {TRACK,loopPoint,nearestOnLoop,travelToBay} from './route.js';
 import {createExchangeCard} from './exchange-card.js';
-import {createDataPipe} from './data-pipe.js';
+import {createEnergyNetwork} from './energy-network.js';
 import {pickDestination,planRoadTrip,roadTripPoint} from './click-navigation.js';
 import {PARK_SETTLE_SECONDS,createChargingMotion,sampleChargingMotion} from './charging-motion.js';
 
@@ -60,9 +60,10 @@ car.position.copy(START);car.rotation.y=-Math.PI/2;
 // Transparent billboard follows the selected charging pile.
 const cardTexture=texture(900,470,()=>{});
 const ctx=cardTexture.image.getContext('2d');
-const card=new THREE.Sprite(new THREE.SpriteMaterial({map:cardTexture,transparent:true,depthWrite:false}));
+const card=new THREE.Sprite(new THREE.SpriteMaterial({map:cardTexture,transparent:true,depthWrite:false,depthTest:false,toneMapped:false}));
+card.renderOrder=12;
 card.scale.set(5.3,2.77,1);scene.add(card);
-const dataPipe=createDataPipe(scene,exchange.card,card);
+const dataPipe=createEnergyNetwork(scene,exchange.card,card,(count,total)=>exchange.receiveBatch(count,total));
 const markerMaterial=new THREE.MeshBasicMaterial({color:0x51e6bf,transparent:true,opacity:.85,depthWrite:false});
 const selectionRing=new THREE.Mesh(new THREE.RingGeometry(.94,1,64),markerMaterial);
 selectionRing.rotation.x=-Math.PI/2;selectionRing.scale.set(1.3,2.65,1);selectionRing.visible=false;scene.add(selectionRing);
@@ -83,7 +84,8 @@ function drawCard(value,phase){
   ctx.fillStyle='rgba(5,35,50,0.79)';
   ctx.beginPath();ctx.roundRect(8,8,884,454,28);ctx.fill();
   ctx.strokeStyle='rgba(124,245,233,.85)';ctx.lineWidth=3;ctx.stroke();
-  ctx.fillStyle='#b0e1dd';ctx.font='24px sans-serif';ctx.fillText('NEO  /  ENERGY REWARDS',42,64);
+  ctx.fillStyle='#b0e1dd';ctx.font='24px "Microsoft YaHei", sans-serif';
+  ctx.fillText(`充电桩 EV 0${chosen+1}  /  ENERGY DATA`,42,64);
   ctx.fillStyle='#fff';ctx.font='bold 90px sans-serif';ctx.fillText(`+${value}`,40,195);
   ctx.fillStyle='#63efce';ctx.font='38px sans-serif';ctx.fillText('RWAT',340,190);
   ctx.strokeStyle='#71e5d3';ctx.lineWidth=7;
@@ -96,7 +98,8 @@ function drawCard(value,phase){
   ctx.fillStyle='rgba(177,230,227,.15)';ctx.fillRect(44,316,810,8);
   ctx.fillStyle='#64eac9';ctx.fillRect(44,316,810*((value-100)/900),8);
   ctx.font='24px "Microsoft YaHei", sans-serif';ctx.fillStyle='#89bcbf';
-  ctx.fillText('上链演示',42,394);ctx.fillText('CLEAN ENERGY  ↗',550,394);
+  ctx.fillText('模拟数据 · 非真实上链',42,394);
+  ctx.fillText(phase==='charging'?'180 kW  →  预言机 × 3':'等待充电  →  预言机 × 3',493,394);
   cardTexture.needsUpdate=true;
 }
 
@@ -133,6 +136,7 @@ function syncUI(){
 function setPhase(next){phase=next;phaseTime=0;syncUI();}
 function selectBay(index){
   chosen=index;$('bay-select').value=String(index);
+  lastCardValue=-1;
   const station=world.chargers[index];
   card.position.set(Math.max(.7,station.group.position.x),5.7,station.group.position.z);
   reward=100;syncUI();
@@ -231,7 +235,7 @@ function park(index=chosen){
   points.push(new THREE.Vector3(x,.44,-3.3));
   const curve=new THREE.CatmullRomCurve3(points,false,'centripetal');
   autopilot={curve,t:0,duration:Math.max(2.8,curve.getLength()/4.4),reverse:false};
-  active=station;reward=100;speed=0;
+  active=station;reward=100;speed=0;dataPipe.reset();exchange.resetBatches();lastCardValue=-1;
   card.position.set(Math.max(.7,station.group.position.x),5.7,station.group.position.z);
   setPhase('parking');notify(`驶向 EV 0${chosen+1}，停稳后自动插枪`);
 }
@@ -270,6 +274,7 @@ function driveOut(){
   setPhase('leaving');notify('充电枪已归位，车辆驶回道路');
 }
 function reset(){
+  dataPipe.reset();exchange.resetBatches();
   restoreGun();active=null;autopilot=null;tour=null;tourPaused=false;tourAfterLeave=false;speed=0;reward=100;keys.clear();
   clearDestination();carSelected=false;selectionRing.visible=false;
   car.position.copy(START);car.rotation.set(0,-Math.PI/2,0);
@@ -314,7 +319,7 @@ function setView(name){
     car:{p:car.position.clone().add(new THREE.Vector3(7.6,4.5,-8.4)),t:car.position.clone().add(new THREE.Vector3(0,.7,0))},
     charger:{p:new THREE.Vector3(world.chargers[chosen].x+11,10,12),t:new THREE.Vector3(world.chargers[chosen].x+1,.8,-5)},
     harbor:{p:new THREE.Vector3(43,14,15),t:new THREE.Vector3(28,-1,-1)},
-    exchange:{p:new THREE.Vector3(-3.2,10.7,10.8),t:new THREE.Vector3(-4.8,innerHeight<850?5:6.3,-9.8)},
+    exchange:{p:new THREE.Vector3(card.position.x-3.2,15,innerWidth<640?64:24),t:new THREE.Vector3(card.position.x-3.2,innerHeight<850?5.8:9,-8)},
   };
   viewTransition={from:camera.position.clone(),fromTarget:controls.target.clone(),...presets[name],time:0};
   document.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===name));
@@ -477,7 +482,15 @@ function animate(){
   uiTime+=dt;
   if(uiTime>.15){$('speed').textContent=String(Math.round(Math.abs(speed)*3.6));syncUI();uiTime=0;}
   controls.update();
-  dataPipe.update(dt,camera,phase==='charging');
+  const network=dataPipe.update(dt,camera,phase==='charging',reward,world.chargers[chosen].group);
+  exchange.updateAnchor();
+  const networkStatus=$('network-status');
+  if(networkStatus){
+    const description=phase==='charging'
+      ?`${['充电桩正在向预言机 X1、X2、X3 发送数据','三路预言机校验通过，正在提交联盟链','联盟链正在向交易所 K 线图传输数据'][network.stage]}。交易所已接收 ${network.delivered} 批模拟数据。`
+      :'数据链路待命：充电桩 → 预言机 X1、X2、X3 → 联盟链 → 交易所 K 线图。';
+    if(networkStatus.textContent!==description)networkStatus.textContent=description;
+  }
   composer.render();
 }
 selectBay(1);syncUI();$('loading').classList.add('done');
