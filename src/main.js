@@ -12,7 +12,7 @@ import {TRACK,loopPoint,nearestOnLoop,travelToBay} from './route.js';
 import {createExchangeCard} from './exchange-card.js';
 import {createEnergyNetwork} from './energy-network.js';
 import {pickDestination,planRoadTrip,roadTripPoint} from './click-navigation.js';
-import {PARK_SETTLE_SECONDS,createChargingMotion,sampleChargingMotion} from './charging-motion.js';
+import {PARK_SETTLE_SECONDS,createChargingMotion,sampleChargingMotion,hasPlugContact} from './charging-motion.js';
 
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();
@@ -54,7 +54,12 @@ composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.
 composer.addPass(new OutputPass());
 const world=buildWorld(scene);
 const exchange=createExchangeCard(scene);
-const vehicle=createCar();const car=vehicle.group;scene.add(car);
+const vehicle=await createCar().catch(error=>{
+  $('load-hint').textContent='汽车模型加载失败，请刷新页面重试。';
+  throw error;
+});
+const car=vehicle.group;scene.add(car);
+document.body.dataset.vehicle='detailed-glb';
 const START=new THREE.Vector3(-5,.44,5.7);
 car.position.copy(START);car.rotation.y=-Math.PI/2;
 
@@ -73,10 +78,11 @@ const roadGuide=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineDashedMa
 roadGuide.visible=false;scene.add(roadGuide);
 let chosen=1,phase='idle',reward=100,speed=0,phaseTime=0,autopilot=null,active=null;
 let cable=null,gunRotation=null,gunTargetRotation=null,gunMotion=null,gunTime=0,viewTransition=null;
+let plugConnected=false;
 let tour=null,tourPaused=false,tourAfterLeave=false;
 let carSelected=false,navigationPlan=null,navigationDistance=0,pendingDestination=null;
 const keys=new Set();
-const modes={idle:'道路行驶',navigating:'正在前往点击位置',cruising:'环路巡航 · 返回充电站',parking:'自动泊车中',settling:'车辆停稳 · 准备插枪',connecting:'自动插枪',disconnecting:'正在收回充电枪',charging:'正在充电',charged:'充电完成',leaving:'正在驶出'};
+const modes={idle:'道路行驶',navigating:'正在前往点击位置',cruising:'环路巡航 · 返回充电站',parking:'自动泊车中',settling:'车辆停稳 · 准备插枪',connecting:'自动插枪',disconnecting:'正在收回充电枪',charging:'正在充电',charged:'充电完成 · 数据在线',leaving:'正在驶出'};
 const connectedPhases=['settling','connecting','charging','charged'];
 const driveKeys=['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright',' '];
 function notify(message){
@@ -218,6 +224,7 @@ function connect(){
   setPhase('connecting');
 }
 function restoreGun(){
+  plugConnected=false;
   if(!active)return;
   active.group.add(active.gun);active.gun.position.copy(active.dockPosition);
   active.gun.rotation.set(0,0,-.25);active.idleCable.visible=true;
@@ -282,9 +289,9 @@ function setView(name){
   const presets={
     overview:{p:new THREE.Vector3(46,43,60),t:overviewTarget()},
     car:{p:car.position.clone().add(new THREE.Vector3(7.6,4.5,-8.4)),t:car.position.clone().add(new THREE.Vector3(0,.7,0))},
-    charger:{p:new THREE.Vector3(world.chargers[chosen].x+11,10,12),t:new THREE.Vector3(world.chargers[chosen].x+1,.8,-5)},
+    charger:{p:new THREE.Vector3(world.chargers[chosen].x+13,12,17),t:new THREE.Vector3(world.chargers[chosen].x+1,2.8,-5)},
     harbor:{p:new THREE.Vector3(43,14,15),t:new THREE.Vector3(28,-1,-1)},
-    exchange:{p:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,15,innerWidth<640?64:24),t:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,innerHeight<850?5.8:9,-8)},
+    exchange:{p:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,12,innerWidth<640?64:24),t:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,innerHeight<850?3.4:6,-8)},
   };
   viewTransition={from:camera.position.clone(),fromTarget:controls.target.clone(),...presets[name],time:0};
   document.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===name));
@@ -427,20 +434,22 @@ function animate(){
   if(phase==='settling'&&phaseTime>=PARK_SETTLE_SECONDS)connect();
   else if(phase==='connecting'){
     gunTime=Math.min(gunMotion.duration,gunTime+dt);
-    if(updateGun()){setPhase('charging');notify('充电枪已插稳，开始充电并累积 RWAT');}
+    if(updateGun()){plugConnected=true;setPhase('charging');notify('充电枪已插稳，开始充电并持续传输数据');}
   }else if(phase==='disconnecting'){
     gunTime=Math.max(0,gunTime-dt*1.4);updateGun();
+    if(!hasPlugContact(gunMotion,gunTime))plugConnected=false;
     if(gunTime===0)driveOut();
   }
   if(phase==='charging'){
     reward=Math.min(1000,100+phaseTime*60);
-    if(reward>=1000){setPhase('charged');notify('充电完成 · +1000 RWAT 已记录（演示）');}
+    if(reward>=1000){setPhase('charged');notify('充电完成 · 数据持续传输，拔枪后停止');}
   }
   vehicle.wheels.forEach(wheel=>wheel.rotation.x-=speed*dt/vehicle.wheelRadius);
   const yawDelta=Math.atan2(Math.sin(car.rotation.y-previousYaw),Math.cos(car.rotation.y-previousYaw));
   const steer=Math.abs(speed)>.1?THREE.MathUtils.clamp(Math.atan(2.87*yawDelta/(speed*dt)),-.5,.5):0;
   vehicle.steering.forEach(pivot=>pivot.rotation.y=THREE.MathUtils.damp(pivot.rotation.y,steer,8,dt));
   vehicle.reverseLights.visible=speed<-.05;
+  vehicle.setPortOpen(['settling','connecting','charging','charged','disconnecting'].includes(phase),dt);
   selectionRing.position.set(car.position.x,.474,car.position.z);
   selectionRing.rotation.set(-Math.PI/2,0,-car.rotation.y);
   targetPin.position.y=.8+Math.sin(time*3.5)*.12;
@@ -454,11 +463,13 @@ function animate(){
   uiTime+=dt;
   if(uiTime>.15){$('speed').textContent=String(Math.round(Math.abs(speed)*3.6));syncUI();uiTime=0;}
   controls.update();
-  const network=dataPipe.update(dt,camera,phase==='charging',reward,world.chargers[chosen].group);
+  const network=dataPipe.update(dt,camera,plugConnected,reward,world.chargers[chosen].group,phase==='charging');
+  document.body.dataset.connected=String(plugConnected);
+  document.body.dataset.delivered=String(network.delivered);
   exchange.updateAnchor();
   const networkStatus=$('network-status');
   if(networkStatus){
-    const description=phase==='charging'
+    const description=plugConnected
       ?`${['充电桩正在向预言机 X1、X2、X3 发送数据','三路预言机校验通过，正在提交联盟链','联盟链正在向交易所 K 线图传输数据'][network.stage]}。交易所已接收 ${network.delivered} 批模拟数据。`
       :'数据链路待命：充电桩 → 预言机 X1、X2、X3 → 联盟链 → 交易所 K 线图。';
     if(networkStatus.textContent!==description)networkStatus.textContent=description;

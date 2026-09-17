@@ -71,7 +71,7 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
       text(p.ctx,`ORACLE / 0${i+1}`,134,112,17,blue);
       p.ctx.fillStyle='rgba(141,220,255,.16)';p.ctx.fillRect(38,145,564,1);
       text(p.ctx,fields[i],38,188,26,muted);
-      const value=i===0?`${state.energy.toFixed(3)} kWh`:i===1?(active?'充电中 · 180 kW':'设备待命'):`+${Math.floor(state.reward||100)} RWAT`;
+      const value=i===0?`${state.energy.toFixed(3)} kWh`:i===1?(active?(state.drawingPower?'充电中 · 180 kW':'已充满 · 连接在线'):'设备待命'):`+${Math.floor(state.reward||100)} RWAT`;
       text(p.ctx,value,38,239,36,mint,600);
       text(p.ctx,!active?'等待充电数据':state.stage===0?'接收充电桩数据…':state.stage===1?'校验通过 · 提交联盟链':'本批数据已确认',38,300,24,active?mint:muted);
       p.map.needsUpdate=true;
@@ -102,13 +102,13 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
     return {shell,core,packets,arrow,stage:i<3?0:i<6?1:2,curve:null,signature:[]};
   });
   const point=(x,y)=>anchor.clone().addScaledVector(right,x).addScaledVector(up,y);
-  function update(dt,camera,charging,reward=100,station=null){
-    state={...flow.update(dt,charging),reward};
+  function update(dt,camera,charging,reward=100,station=null,drawingPower=charging){
+    state={...flow.update(dt,charging,drawingPower),reward};
     if(state.arrivals)onArrival(state.arrivals,state.delivered);
     right.set(1,0,0).applyQuaternion(camera.quaternion);up.set(0,1,0).applyQuaternion(camera.quaternion);
     if(!station)return state;
     station.updateWorldMatrix(true,false);
-    anchor.copy(station.localToWorld(new THREE.Vector3(0,5.26,0)));
+    anchor.copy(station.localToWorld(new THREE.Vector3(0,3.33,0)));
     uplink.position.copy(station.localToWorld(new THREE.Vector3(0,3.09,0)));
     elapsed+=dt;
     const pulse=charging?.5+.5*Math.sin(elapsed*5):.15;
@@ -116,12 +116,12 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
     glow.material.opacity=.45+pulse*.35;
     ring.scale.setScalar(1+pulse*.15);
     const source=uplink.position.clone().add(new THREE.Vector3(0,.24,0));
-    oracles.forEach((p,i)=>p.sprite.position.copy(point((i-1)*4.4,4.5)));
-    chain.sprite.position.copy(point(0,8.5));appCard.position.copy(point(-10.15,4.05));
+    oracles.forEach((p,i)=>p.sprite.position.copy(point((i-1)*4.4,2.3)));
+    chain.sprite.position.copy(point(0,5.05));appCard.position.copy(point(-10.15,2.8));
     const endpoints=[
       ...oracles.map(p=>[source.clone(),p.sprite.position.clone().addScaledVector(up,-1.04)]),
-      ...oracles.map((p,i)=>[p.sprite.position.clone().addScaledVector(up,1.04),point((i-1)*3.3,7.415)]),
-      [point(-6.2,8.5),appCard.position.clone().addScaledVector(right,2.9)],
+      ...oracles.map((p,i)=>[p.sprite.position.clone().addScaledVector(up,1.04),point((i-1)*3.3,3.965)]),
+      [point(-6.2,5.05),appCard.position.clone().addScaledVector(right,2.9)],
     ];
     links.forEach((link,i)=>{
       const [start,end]=endpoints[i],signature=[...start.toArray(),...end.toArray()];

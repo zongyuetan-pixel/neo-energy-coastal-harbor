@@ -6,6 +6,18 @@ const smooth=t=>{t=clamp(t);return t*t*(3-2*t);};
 const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
 
 export function createChargingMotion(dock,port){
+  if(port[0]>0){
+    // Right-side inlet: follow the clear right-hand corridor, then insert -X.
+    const seated=[port[0]-GUN_TIP[2]-.025,port[1]-GUN_TIP[1],port[2]];
+    const aligned=[seated[0]+.38,seated[1],seated[2]];
+    const corridor=Math.max(1.8,dock[0]+.18);
+    const points=[dock,[corridor,dock[1],dock[2]+.6],
+      [corridor,seated[1],port[2]],aligned,seated];
+    const durations=[.8,2.4,.75,.95];
+    const labels=['充电枪出桩','充电枪沿车辆右侧移动','对准右侧充电接口','正在插入充电枪'];
+    const travelDuration=durations.reduce((sum,n)=>sum+n,0);
+    return {points,durations,labels,travelDuration,duration:travelDuration+.3};
+  }
   // The left-facing gun's local -Z axis points inward (+X).
   const seated=[port[0]+GUN_TIP[2]+.025,port[1]-GUN_TIP[1],port[2]];
   const aligned=[seated[0]-.38,seated[1],seated[2]];
@@ -22,6 +34,14 @@ export function createChargingMotion(dock,port){
   const labels=['充电枪出桩','充电枪移向车尾','充电枪绕行车尾','对准充电接口','接口对准确认','正在插入充电枪'];
   const travelDuration=durations.reduce((sum,n)=>sum+n,0);
   return {points,durations,labels,travelDuration,duration:travelDuration+.3};
+}
+
+// Keep the connection latched during the confirmation pause and until the
+// conductive tip has actually withdrawn from the inlet.
+export function hasPlugContact(motion,time){
+  if(!motion)return false;
+  const p=sampleChargingMotion(motion,time).position,end=motion.points.at(-1);
+  return Math.hypot(...p.map((v,i)=>v-end[i]))<.025;
 }
 
 export function sampleChargingMotion(motion,time){

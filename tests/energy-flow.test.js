@@ -19,3 +19,17 @@ test('no data travels during parking, connection, idle or after charging stops',
   assert.equal(stopped.arrivals,0);
   flow.reset();assert.equal(flow.update(0,false).delivered,0);assert.equal(flow.update(0,false).energy,0);
 });
+test('completed charging keeps sending batches until the plug is removed, without inventing energy',()=>{
+  const flow=createEnergyFlow();
+  const charging=flow.update(15,true,true);
+  const full=flow.update(seconds*6,true,false);
+  assert.equal(full.delivered,charging.delivered+2);
+  assert.equal(full.energy,charging.energy);
+  assert.equal(full.connected,true);
+  assert.equal(full.drawingPower,false);
+  const unplugged=flow.update(60,false,false);
+  assert.equal(unplugged.delivered,full.delivered);
+  assert.equal(unplugged.energy,full.energy);
+  assert.equal(unplugged.arrivals,0);
+  assert.equal(unplugged.connected,false);
+});

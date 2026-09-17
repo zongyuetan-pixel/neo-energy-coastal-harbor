@@ -1,0 +1,21 @@
+Vehicle model: "Tesla White car." by aarajesh
+Original source: https://sketchfab.com/3d-models/tesla-white-car-2a4ee44439dc4b1b98f452a9ff427116
+Author: https://sketchfab.com/aarajesh
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License terms: https://creativecommons.org/licenses/by/4.0/
+
+The original author and license are recorded in the GLB's asset.extras and
+confirmed by the original Sketchfab model's API record.
+Optimized GLB obtained from:
+https://github.com/Olrik-WP/TeslaHub/blob/main/src/TeslaHub.Web/public/community-models/community-m3-rigged.glb
+
+Changes for NEO ENERGY:
+- Rescaled and normalized to the existing scene.
+- Removed exterior brand emblems and plain wheel-centre covers added.
+- Adjusted paint, glass and interior materials.
+- Split paired wheels for independent rolling and front steering.
+- Replaced the original charging flap with a right-side socket and hinged lid.
+- Connected reverse lamps, driving and automatic charging animations.
+
+This model is an independent community creation. No endorsement is implied.
+All model data, embedded textures and Draco decoders are hosted locally.

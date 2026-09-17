@@ -60,6 +60,7 @@ button:disabled{opacity:.42;cursor:default}
 footer{position:fixed;bottom:22px;left:30px;right:30px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#365d6a}
 kbd{display:inline-block;font-family:inherit;font-size:9px;border:1px solid #577e8450;border-radius:4px;padding:3px 5px;background:#eef9f03d}
 footer button{border:0;background:none;color:inherit;font-size:10px}
+.model-credit{color:inherit;font-size:9px;text-decoration:none;opacity:.8}
 footer button kbd{margin-left:7px}
 #toast{position:fixed;bottom:254px;left:50%;transform:translate(-50%,8px);opacity:0;pointer-events:none;background:#123d48ed;color:#d7fff0;padding:12px 21px;border:1px solid #b3ffe44d;border-radius:30px;font-size:12px;transition:.25s;box-shadow:0 6px 25px #173c4a24;white-space:nowrap}
 #toast.show{opacity:1;transform:translate(-50%,0)}
@@ -82,6 +83,7 @@ footer button kbd{margin-left:7px}
   .primary{flex:1}.secondary{flex:1}.energy-row{margin-top:10px}.energy-row small{font-size:8px}
   footer{left:17px;right:17px;bottom:17px;font-size:8px}.desktop-help{display:none}
   footer kbd{font-size:8px;padding:2px 3px}
+  .model-credit{position:absolute;right:0;bottom:21px;font-size:7px}
   #toast{bottom:292px;font-size:10px;max-width:calc(100% - 24px);white-space:normal;text-align:center}
   .touch-drive{display:flex;position:fixed;bottom:279px;left:16px;flex-direction:column;align-items:center;gap:3px}
   .touch-drive div{display:flex;gap:3px}.touch-drive button{touch-action:none;width:35px;height:34px;border:1px solid #dcfbed70;background:#e5f7efbd;color:#1d5963;border-radius:8px}
