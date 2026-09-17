@@ -11,7 +11,7 @@ export function createExchangeCard(scene){
   }));
   card.name='中港世纪web3-专属RWAT交易所（CEX）';
   card.renderOrder=12;
-  card.position.set(-6.8,7.9,-9.8);card.scale.set(5.8,8.9,1);
+  card.position.set(-6.8,7.9,-9.8);card.scale.set(7.15,10.95,1);
   scene.add(card);
   const lightMaterial=new THREE.MeshBasicMaterial({color:0x64eacb,transparent:true,opacity:.48,depthWrite:false});
   const base=new THREE.Mesh(new THREE.RingGeometry(.48,.53,48),lightMaterial);
@@ -120,8 +120,8 @@ export function createExchangeCard(scene){
     text('最高',324,1151,20,muted);text(latest.high.toFixed(4),324,1187,27,green,600);
     text('最低',594,1151,20,muted);text(latest.low.toFixed(4),594,1187,27,red,600);
     round(52,1234,796,76,18,'rgba(101,218,202,.07)','rgba(152,224,218,.18)');
-    text(receiptFlash>0?'联盟链数据已接收 · K线同步中':'模拟行情 · 非实时交易数据',76,1267,22,receiptFlash>0?green:muted);
-    text(`联盟链同步  ${receivedBatches} 批  /  ENERGY TO VALUE`,76,1295,16,'#6f9daa',500);
+    text(receiptFlash>0?'公链数据已接收 · K线同步中':'模拟行情 · 非实时交易数据',76,1267,22,receiptFlash>0?green:muted);
+    text(`跨链桥 / 公链同步  ${receivedBatches} 批  /  ENERGY TO VALUE`,76,1295,16,'#6f9daa',500);
     text(`更新 ${String(sequence).padStart(4,'0')}`,685,1280,18,green);
     map.needsUpdate=true;
   }
@@ -159,7 +159,7 @@ export function createExchangeCard(scene){
       base.position.set(card.position.x,.565,card.position.z);
       beam.geometry.dispose();
       beam.geometry=new THREE.BufferGeometry().setFromPoints([
-        base.position.clone(),card.position.clone().add(new THREE.Vector3(0,-4.45,0)),
+        base.position.clone(),card.position.clone().add(new THREE.Vector3(0,-card.scale.y*.5,0)),
       ]);
       beam.computeLineDistances();
     },

@@ -3,7 +3,7 @@ import {createEnergyFlow} from './energy-flow.js';
 
 // A shared camera-facing plane keeps the diagram readable while orbiting.
 export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
-  const group=new THREE.Group();group.name='充电桩 → 预言机 → 联盟链 → 交易所';scene.add(group);
+  const group=new THREE.Group();group.name='充电桩 → 预言机 → 联盟链 → 跨链桥 → 公链 → 交易所';scene.add(group);
   const flow=createEnergyFlow(),right=new THREE.Vector3(),up=new THREE.Vector3();
   const anchor=new THREE.Vector3(),dummy=new THREE.Object3D();
   const mint='#79f5d0',blue='#8ddcff',muted='#96bac8';
@@ -35,6 +35,8 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
   }
   const oracles=[1,2,3].map(i=>panel(`预言机X${i}`,640,350,3.8,2.08));
   const chain=panel('联盟链',1600,280,12.4,2.17);
+  const bridge=panel('跨链桥',760,210,4.4,1.22);
+  const publicChain=panel('公链',1500,280,11.6,2.17);
   function text(ctx,value,x,y,size,color='#edfaff',weight=400){
     ctx.fillStyle=color;ctx.font=`${weight} ${size}px "Microsoft YaHei", sans-serif`;ctx.fillText(value,x,y);
   }
@@ -85,15 +87,41 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
     text(c,'联盟链',185,106,53,'#edfaff',600);text(c,'CONSORTIUM CHAIN',187,144,21,blue);
     text(c,'预言机共识',555,80,25,muted);text(c,state.confirmed?'3 / 3 已验证':'等待验证',555,125,34,mint,600);
     text(c,'模拟区块高度',902,80,25,muted);text(c,`#${208600+state.confirmed}`,902,125,34,'#edfaff',600);
-    text(c,'交易所已接收',1254,80,25,muted);text(c,`${state.delivered} 批`,1254,125,34,mint,600);
+    text(c,'待跨链批次',1254,80,25,muted);text(c,`${Math.max(0,state.confirmed-state.delivered)} 批`,1254,125,34,mint,600);
     c.fillStyle='rgba(141,220,255,.16)';c.fillRect(45,173,1510,1);
-    text(c,active?(state.stage===2?'数据已入块  →  正在同步交易所 K 线图':'接收三路预言机校验结果'):'充电后自动启动数据链路',48,230,30,active?mint:muted);
+    text(c,active?(state.stage===2?'数据已入块  →  准备通过跨链桥':'接收三路预言机校验结果'):'充电后自动启动数据链路',48,230,30,active?mint:muted);
     text(c,'本地模拟 · 非真实上链',1222,230,23,muted);chain.map.needsUpdate=true;
+
+    frame(bridge,active&&state.stage===2);
+    const b=bridge.ctx;
+    b.strokeStyle=active?mint:blue;b.lineWidth=4;b.lineCap='round';
+    b.beginPath();b.moveTo(64,65);b.bezierCurveTo(86,34,118,34,143,65);b.stroke();
+    b.beginPath();b.moveTo(64,112);b.bezierCurveTo(86,143,118,143,143,112);b.stroke();
+    b.beginPath();b.moveTo(137,54);b.lineTo(147,65);b.lineTo(134,72);b.stroke();
+    b.beginPath();b.moveTo(70,105);b.lineTo(59,112);b.lineTo(72,122);b.stroke();
+    text(b,'跨链桥',184,82,41,'#edfaff',600);text(b,'CROSS-CHAIN BRIDGE',185,115,18,blue);
+    b.fillStyle='rgba(141,220,255,.16)';b.fillRect(454,32,1,146);
+    text(b,'联盟链  →  公链',490,77,25,muted);text(b,active&&state.stage===2?'加密传输中':'桥接待命',490,124,31,active?mint:muted,600);
+    bridge.map.needsUpdate=true;
+
+    frame(publicChain,active&&state.stage===2);
+    const p=publicChain.ctx;
+    p.strokeStyle=mint;p.lineWidth=3;
+    p.beginPath();p.arc(92,108,38,0,Math.PI*2);p.stroke();
+    p.beginPath();p.ellipse(92,108,17,38,0,0,Math.PI*2);p.stroke();
+    p.beginPath();p.moveTo(54,108);p.lineTo(130,108);p.stroke();
+    text(p,'公链',165,105,53,'#edfaff',600);text(p,'PUBLIC CHAIN · RWAT MAINNET',167,144,21,blue);
+    text(p,'跨链状态',615,80,25,muted);text(p,active&&state.stage===2?'桥接确认中':'等待桥接',615,125,34,active?mint:muted,600);
+    text(p,'模拟区块高度',953,80,25,muted);text(p,`#${861900+state.delivered}`,953,125,34,'#edfaff',600);
+    text(p,'交易所已接收',1245,80,25,muted);text(p,`${state.delivered} 批`,1245,125,34,mint,600);
+    p.fillStyle='rgba(141,220,255,.16)';p.fillRect(45,173,1410,1);
+    text(p,active?(state.stage===2?'跨链数据确认  →  同步 RWAT 交易所':'等待联盟链完成共识'):'公链节点待命',48,230,30,active?mint:muted);
+    text(p,'本地模拟 · 非真实公链',1162,230,23,muted);publicChain.map.needsUpdate=true;
   }
   const shellMat=new THREE.MeshBasicMaterial({color:0x66ddeb,transparent:true,opacity:.17,depthWrite:false,depthTest:false});
   const coreMat=new THREE.MeshBasicMaterial({color:0x65daca,transparent:true,opacity:.48,depthWrite:false,depthTest:false,toneMapped:false});
   const pulseMat=new THREE.MeshBasicMaterial({color:0xb0ffe5,transparent:true,depthWrite:false,depthTest:false,toneMapped:false});
-  const links=Array.from({length:7},(_,i)=>{
+  const links=Array.from({length:9},(_,i)=>{
     const shell=new THREE.Mesh(new THREE.BufferGeometry(),shellMat),core=new THREE.Mesh(new THREE.BufferGeometry(),coreMat);
     const packets=new THREE.InstancedMesh(new THREE.SphereGeometry(.072,8,6),pulseMat,7);packets.frustumCulled=false;
     const arrow=new THREE.Mesh(new THREE.ConeGeometry(.13,.32,8),pulseMat);
@@ -116,30 +144,41 @@ export function createEnergyNetwork(scene,appCard,onArrival=()=>{}){
     glow.material.opacity=.45+pulse*.35;
     ring.scale.setScalar(1+pulse*.15);
     const source=uplink.position.clone().add(new THREE.Vector3(0,.24,0));
-    oracles.forEach((p,i)=>p.sprite.position.copy(point((i-1)*4.4,2.3)));
-    chain.sprite.position.copy(point(0,5.05));appCard.position.copy(point(-10.15,2.8));
+    oracles.forEach((p,i)=>p.sprite.position.copy(point((i-1)*4.4,2.25)));
+    chain.sprite.position.copy(point(0,5));
+    bridge.sprite.position.copy(point(0,6.86));
+    publicChain.sprite.position.copy(point(0,8.82));
+    appCard.position.copy(point(-10.75,4.72));
     const endpoints=[
       ...oracles.map(p=>[source.clone(),p.sprite.position.clone().addScaledVector(up,-1.04)]),
-      ...oracles.map((p,i)=>[p.sprite.position.clone().addScaledVector(up,1.04),point((i-1)*3.3,3.965)]),
-      [point(-6.2,5.05),appCard.position.clone().addScaledVector(right,2.9)],
+      ...oracles.map((p,i)=>[p.sprite.position.clone().addScaledVector(up,1.04),point((i-1)*3.3,3.915)]),
+      [point(0,6.085),bridge.sprite.position.clone().addScaledVector(up,-.61)],
+      [bridge.sprite.position.clone().addScaledVector(up,.61),publicChain.sprite.position.clone().addScaledVector(up,-1.085)],
+      [publicChain.sprite.position.clone().addScaledVector(up,1.085),appCard.position.clone().addScaledVector(up,appCard.scale.y*.5-.12)],
     ];
     links.forEach((link,i)=>{
       const [start,end]=endpoints[i],signature=[...start.toArray(),...end.toArray()];
       if(!link.curve||signature.some((n,k)=>Math.abs(n-link.signature[k])>.002)){
         link.signature=signature;
-        const bend=i===6?right.clone().multiplyScalar(-1.8):up.clone().multiplyScalar(start.distanceTo(end)*.48);
-        link.curve=new THREE.CubicBezierCurve3(start,start.clone().add(bend),end.clone().sub(bend),end);
+        const distance=start.distanceTo(end);
+        const startBend=i===8?up.clone().multiplyScalar(1.65):up.clone().multiplyScalar(distance*.48);
+        const endControl=i===8
+          ?end.clone().addScaledVector(right,2.1).addScaledVector(up,-1.2)
+          :end.clone().sub(startBend);
+        link.curve=new THREE.CubicBezierCurve3(start,start.clone().add(startBend),endControl,end);
         for(const [mesh,radius] of [[link.shell,.095],[link.core,.025]]){
           mesh.geometry.dispose();mesh.geometry=new THREE.TubeGeometry(link.curve,32,radius,6,false);
         }
         link.arrow.position.copy(link.curve.getPoint(.87));
         link.arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),link.curve.getTangent(.87));
       }
-      link.packets.visible=charging&&state.stage===link.stage;
-      link.arrow.scale.setScalar(charging&&state.stage===link.stage?1.2:.75);
+      const segmentProgress=i<6?state.progress:THREE.MathUtils.clamp(state.progress*3-(i-6),0,1);
+      const activeSegment=charging&&state.stage===link.stage&&(i<6||segmentProgress>0&&segmentProgress<1);
+      link.packets.visible=activeSegment;
+      link.arrow.scale.setScalar(activeSegment?1.2:.75);
       if(link.packets.visible){
         for(let tail=0;tail<7;tail++){
-          dummy.position.copy(link.curve.getPoint(Math.max(0,state.progress-tail*.018)));
+          dummy.position.copy(link.curve.getPoint(Math.max(0,segmentProgress-tail*.018)));
           dummy.scale.setScalar(1-tail*.11);dummy.updateMatrix();link.packets.setMatrixAt(tail,dummy.matrix);
         }
         link.packets.instanceMatrix.needsUpdate=true;

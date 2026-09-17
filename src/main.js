@@ -291,7 +291,7 @@ function setView(name){
     car:{p:car.position.clone().add(new THREE.Vector3(7.6,4.5,-8.4)),t:car.position.clone().add(new THREE.Vector3(0,.7,0))},
     charger:{p:new THREE.Vector3(world.chargers[chosen].x+13,12,17),t:new THREE.Vector3(world.chargers[chosen].x+1,2.8,-5)},
     harbor:{p:new THREE.Vector3(43,14,15),t:new THREE.Vector3(28,-1,-1)},
-    exchange:{p:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,12,innerWidth<640?64:24),t:new THREE.Vector3(world.chargers[chosen].group.position.x-3.2,innerHeight<850?3.4:6,-8)},
+    exchange:{p:new THREE.Vector3(world.chargers[chosen].group.position.x-3.5,15,innerWidth<640?72:31),t:new THREE.Vector3(world.chargers[chosen].group.position.x-3.5,innerHeight<850?5.2:6.8,-8)},
   };
   viewTransition={from:camera.position.clone(),fromTarget:controls.target.clone(),...presets[name],time:0};
   document.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===name));
@@ -304,6 +304,14 @@ $('select-car').addEventListener('click',selectCar);
 $('leave-button').addEventListener('click',leave);
 $('reset-button').addEventListener('click',reset);
 $('bay-select').addEventListener('change',event=>selectBay(Number(event.target.value)));
+const controlPanel=document.querySelector('.control-panel'),panelToggle=$('panel-toggle');
+function setPanelCollapsed(collapsed){
+  controlPanel.classList.toggle('collapsed',collapsed);document.body.classList.toggle('panel-collapsed',collapsed);
+  panelToggle.setAttribute('aria-expanded',String(!collapsed));
+  panelToggle.setAttribute('aria-label',collapsed?'展开驾驶与充电控制':'收起驾驶与充电控制');
+  panelToggle.querySelector('span').textContent=collapsed?'展开':'收起';
+}
+panelToggle.addEventListener('click',()=>setPanelCollapsed(!controlPanel.classList.contains('collapsed')));
 // Distinguish a click on the actual vehicle from a camera orbit/drag.
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 let pointerDown=null;
@@ -470,8 +478,8 @@ function animate(){
   const networkStatus=$('network-status');
   if(networkStatus){
     const description=plugConnected
-      ?`${['充电桩正在向预言机 X1、X2、X3 发送数据','三路预言机校验通过，正在提交联盟链','联盟链正在向交易所 K 线图传输数据'][network.stage]}。交易所已接收 ${network.delivered} 批模拟数据。`
-      :'数据链路待命：充电桩 → 预言机 X1、X2、X3 → 联盟链 → 交易所 K 线图。';
+      ?`${['充电桩正在向预言机 X1、X2、X3 发送数据','三路预言机校验通过，正在提交联盟链','联盟链经跨链桥写入公链，并同步交易所 K 线图'][network.stage]}。交易所已接收 ${network.delivered} 批模拟数据。`
+      :'数据链路待命：充电桩 → 预言机 X1、X2、X3 → 联盟链 → 跨链桥 → 公链 → 交易所 K 线图。';
     if(networkStatus.textContent!==description)networkStatus.textContent=description;
   }
   composer.render();
